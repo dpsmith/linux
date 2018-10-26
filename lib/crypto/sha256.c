@@ -135,7 +135,9 @@ void sha256_update(struct sha256_state *sctx, const u8 *data, unsigned int len)
 {
 	lib_sha256_base_do_update(sctx, data, len, sha256_transform_blocks);
 }
+#ifndef SHA256_DISABLE_EXPORT
 EXPORT_SYMBOL(sha256_update);
+#endif
 
 static void __sha256_final(struct sha256_state *sctx, u8 *out, int digest_size)
 {
@@ -147,13 +149,17 @@ void sha256_final(struct sha256_state *sctx, u8 *out)
 {
 	__sha256_final(sctx, out, 32);
 }
+#ifndef SHA256_DISABLE_EXPORT
 EXPORT_SYMBOL(sha256_final);
+#endif
 
 void sha224_final(struct sha256_state *sctx, u8 *out)
 {
 	__sha256_final(sctx, out, 28);
 }
+#ifndef SHA256_DISABLE_EXPORT
 EXPORT_SYMBOL(sha224_final);
+#endif
 
 void sha256(const u8 *data, unsigned int len, u8 *out)
 {
@@ -163,6 +169,8 @@ void sha256(const u8 *data, unsigned int len, u8 *out)
 	sha256_update(&sctx, data, len);
 	sha256_final(&sctx, out);
 }
+#ifndef SHA256_DISABLE_EXPORT
 EXPORT_SYMBOL(sha256);
+#endif
 
 MODULE_LICENSE("GPL");
