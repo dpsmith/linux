@@ -69,6 +69,12 @@ static void sl_txt_reset(u64 error)
 	asm volatile ("hlt");
 }
 
+static void sl_skinit_reset(void)
+{
+	/* TODO not sure what else to do here. Is there an error reg? */
+	__asm__ __volatile__ ("ud2");
+}
+
 static u64 sl_rdmsr(u32 reg)
 {
 	u64 lo, hi;
@@ -116,6 +122,9 @@ static void sl_find_event_log(struct tpm *tpm)
 	struct txt_os_mle_data *os_mle_data;
 	void *os_sinit_data;
 	void *txt_heap;
+
+	if (sl_cpu_type == SL_CPU_AMD)
+		return;
 
 	txt_heap = (void *)sl_txt_read(TXT_CR_HEAP_BASE);
 
@@ -237,8 +246,12 @@ void sl_tpm_extend_pcr(struct tpm *tpm, u32 pcr, const u8 *data, u32 length,
 					   TPM_ALG_SHA256,
 					   (const u8 *)desc, strlen(desc));
 			return;
-		} else
-			sl_txt_reset(SL_ERROR_TPM_EXTEND);
+		} else {
+			if (sl_cpu_type == SL_CPU_INTEL)
+				sl_txt_reset(SL_ERROR_TPM_EXTEND);
+			else
+				sl_skinit_reset();
+		}
 #endif
 #ifdef CONFIG_SECURE_LAUNCH_SHA512
 		struct sha512_state sctx = {0};
@@ -253,8 +266,12 @@ void sl_tpm_extend_pcr(struct tpm *tpm, u32 pcr, const u8 *data, u32 length,
 					   TPM_ALG_SHA512,
 					   (const u8 *)desc, strlen(desc));
 			return;
-		} else
-			sl_txt_reset(SL_ERROR_TPM_EXTEND);
+		} else {
+			if (sl_cpu_type == SL_CPU_INTEL)
+				sl_txt_reset(SL_ERROR_TPM_EXTEND);
+			else
+				sl_skinit_reset();
+		}
 #endif
 	}
 
@@ -262,8 +279,12 @@ void sl_tpm_extend_pcr(struct tpm *tpm, u32 pcr, const u8 *data, u32 length,
 	early_sha1_update(&sctx, data, length);
 	early_sha1_final(&sctx, &sha1_hash[0]);
 	ret = tpm_extend_pcr(tpm, pcr, TPM_ALG_SHA1, &sha1_hash[0]);
-	if (ret)
-		sl_txt_reset(SL_ERROR_TPM_EXTEND);
+	if (ret) {
+		if (sl_cpu_type == SL_CPU_INTEL)
+			sl_txt_reset(SL_ERROR_TPM_EXTEND);
+		else
+			sl_skinit_reset();
+	}
 
 	if (tpm->family == TPM20)
 		sl_tpm20_log_event(pcr, &sha1_hash[0], TPM_ALG_SHA1,
@@ -285,11 +306,10 @@ void sl_main(u8 *bootparams)
 	u32 data_count, os_mle_len;
 
 	/*
-	 * Currently only Intel TXT is supported for Secure Launch. Testing
-	 * this value also indicates that the kernel was booted successfully
-	 * through the Secure Launch entry point and is in SMX mode.
+	 * Testing this value indicates that the kernel was booted successfully
+	 * through the Secure Launch entry point and is in proper mode.
 	 */
-	if (!(sl_cpu_type & SL_CPU_INTEL))
+	if (!(sl_cpu_type & (SL_CPU_INTEL | SL_CPU_AMD)))
 		return;
 
 	/*
@@ -297,8 +317,12 @@ void sl_main(u8 *bootparams)
 	 * environment depends on this and the other TPM operations succeeding.
 	 */
 	tpm = enable_tpm();
-	if (!tpm)
-		sl_txt_reset(SL_ERROR_TPM_INIT);
+	if (!tpm) {
+		if (sl_cpu_type == SL_CPU_INTEL)
+			sl_txt_reset(SL_ERROR_TPM_INIT);
+		else
+			sl_skinit_reset();
+	}
 
 	/* Locate the TPM event log. */
 	sl_find_event_log(tpm);
@@ -307,8 +331,12 @@ void sl_main(u8 *bootparams)
 	 * Locality 2 is being opened so that the DRTM PCRs can be updated,
 	 * specifically 17 and 18.
 	 */
-	if (tpm_request_locality(tpm, 2) == TPM_NO_LOCALITY)
-		sl_txt_reset(SL_ERROR_TPM_GET_LOC);
+	if (tpm_request_locality(tpm, 2) == TPM_NO_LOCALITY) {
+		if (sl_cpu_type == SL_CPU_INTEL)
+			sl_txt_reset(SL_ERROR_TPM_GET_LOC);
+		else
+			sl_skinit_reset();
+	}
 
 	/* Measure the zero page/boot params */
 	sl_tpm_extend_pcr(tpm, SL_CONFIG_PCR18, bootparams, PAGE_SIZE,
