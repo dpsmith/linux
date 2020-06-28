@@ -119,7 +119,7 @@ static void sl_find_event_log(struct tpm *tpm)
 	txt_heap = (void *)sl_txt_read(TXT_CR_HEAP_BASE);
 
 	os_mle_data = txt_os_mle_data_start(txt_heap);
-	evtlog_base = (void *)&os_mle_data->event_log_buffer[0];
+	evtlog_base = (void *)os_mle_data->evtlog_addr;
 
 	if (tpm->family != TPM20)
 		return;
@@ -144,7 +144,6 @@ static void sl_tpm12_log_event(u32 pcr, u8 *digest,
 	u32 total_size;
 	u8 log_buf[SL_TPM12_LOG_SIZE];
 
-	memset(log_buf, 0, SL_TPM12_LOG_SIZE);
 	pcr_event = (struct tpm12_pcr_event *)log_buf;
 	pcr_event->pcr_index = pcr;
 	pcr_event->type = TXT_EVTYPE_SLAUNCH;
@@ -170,7 +169,6 @@ static void sl_tpm20_log_event(u32 pcr, u8 *digest, u16 algo,
 	u32 total_size;
 	u8 log_buf[SL_TPM20_LOG_SIZE];
 
-	memset(log_buf, 0, SL_TPM20_LOG_SIZE);
 	head = (struct tpm20_pcr_event_head *)log_buf;
 	head->pcr_index = pcr;
 	head->event_type = TXT_EVTYPE_SLAUNCH;
@@ -354,26 +352,26 @@ void sl_main(u8 *bootparams)
 				  bp->hdr.ramdisk_size,
 				  "Measured initramfs into PCR17");
 
-	/*
-	 * Some extra work to do on Intel, have to measure the OS-MLE
-	 * heap area.
-	 */
-	txt_heap = (void *)sl_txt_read(TXT_CR_HEAP_BASE);
-	os_mle_data = txt_os_mle_data_start(txt_heap);
+	if (sl_cpu_type == SL_CPU_INTEL) {
+		/*
+		* Some extra work to do on Intel, have to measure the OS-MLE
+		* heap area.
+		*/
+		txt_heap = (void *)sl_txt_read(TXT_CR_HEAP_BASE);
+		os_mle_data = txt_os_mle_data_start(txt_heap);
 
-	/*
-	 * Measure OS-MLE data up to the MLE scratch field. The MLE scratch
-	 * field and the TPM logging should not be measured.
-	 */
-	os_mle_len = offsetof(struct txt_os_mle_data, mle_scratch);
-	sl_tpm_extend_pcr(tpm, SL_CONFIG_PCR18, (u8 *)os_mle_data, os_mle_len,
-			  "Measured TXT OS-MLE data into PCR18");
+		/* Measure OS-MLE data up to the MLE scratch field. */
+		os_mle_len = offsetof(struct txt_os_mle_data, mle_scratch);
+		sl_tpm_extend_pcr(tpm, SL_CONFIG_PCR18, (u8 *)os_mle_data,
+				  os_mle_len,
+				  "Measured TXT OS-MLE data into PCR18");
 
-	/*
-	 * Now that the OS-MLE data is measured, ensure the MTRR and
-	 * misc enable MSRs are what we expect.
-	 */
-	sl_txt_validate_msrs(os_mle_data);
+		/*
+		 * Now that the OS-MLE data is measured, ensure the MTRR and
+		 * misc enable MSRs are what we expect.
+		 */
+		sl_txt_validate_msrs(os_mle_data);
+	}
 
 	tpm_relinquish_locality(tpm);
 	free_tpm(tpm);
