@@ -209,6 +209,9 @@ SYM_FUNC_START(sl_stub)
 	ud2
 
 .Ldo_amd:
+	/* Save our base pointer reg */
+	pushl	%ebx
+
 	cmpl	$(AMD_CPUID_MFGID_EBX), %ebx
 	jnz	.Ldo_unknown_cpu
 	cmpl	$(AMD_CPUID_MFGID_EDX), %edx
@@ -216,8 +219,10 @@ SYM_FUNC_START(sl_stub)
 	cmpl	$(AMD_CPUID_MFGID_ECX), %ecx
 	jnz	.Ldo_unknown_cpu
 
+	popl	%ebx
+
 	/* Know it is AMD */
-	movl	$(SL_CPU_AMD), sl_cpu_type(%ebp)
+	movl	$(SL_CPU_AMD), sl_cpu_type(%ebx)
 
 	/*
 	 * Enable global interrupts including SMI and NMI (GIF).
