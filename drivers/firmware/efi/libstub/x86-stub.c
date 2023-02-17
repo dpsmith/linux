@@ -9,6 +9,7 @@
 #include <linux/efi.h>
 #include <linux/pci.h>
 #include <linux/stddef.h>
+#include <linux/slr_table.h>
 
 #include <asm/efi.h>
 #include <asm/e820/types.h>
