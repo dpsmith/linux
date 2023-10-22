@@ -1,12 +1,18 @@
+.. SPDX-License-Identifier: GPL-2.0
+.. Copyright © 2019-2023 Daniel P. Smith <dpsmith@apertussolutions.com>
+
 =======================
 System Launch Integrity
 =======================
 
+:Author: Daniel P. Smith
+:Date: October 2023
+
 This document serves to establish a common understanding of what is system
 launch, the integrity concern for system launch, and why using a Root of Trust
-(RoT) from a Dynamic Launch may be desired. Through out this document
-terminology from the Trusted Computing Group (TCG) and National Institue for
-Science and Technology (NIST) is used to ensure a vendor nutrual language is
+(RoT) from a Dynamic Launch may be desired. Throughout this document
+terminology from the Trusted Computing Group (TCG) and National Institute for
+Science and Technology (NIST) is used to ensure a vendor natural language is
 used to describe and reference security-related concepts.
 
 System Launch
@@ -14,12 +20,12 @@ System Launch
 
 There is a tendency to only consider the classical power-on boot as the only
 means to launch an Operating System (OS) on a computer system, but in fact most
-modern processors support two methods to launch the system. To provide clarity a
-common definition of a system launch should be established. This definition is
-that a during a single power life cycle of a system, a System Launch consists
-of an initialization event, typically in hardware, that is followed by an
-executing software payload that takes the system from the initialized state to
-a running state. Driven by the Trusted Computing Group (TCG) architecture,
+modern processors support two methods to launch the system. To provide clarity
+a common definition of a system launch should be established. This definition
+is that a during a single power life cycle of a system, a System Launch
+consists of an initialization event, typically in hardware, that is followed by
+an executing software payload that takes the system from the initialized state
+to a running state. Driven by the Trusted Computing Group (TCG) architecture,
 modern processors are able to support two methods to launch a system, these two
 types of system launch are known as Static Launch and Dynamic Launch.
 
@@ -27,7 +33,7 @@ Static Launch
 -------------
 
 Static launch is the system launch associated with the power cycle of the CPU.
-Thus static launch refers to the classical power-on boot where the
+Thus, static launch refers to the classical power-on boot where the
 initialization event is the release of the CPU from reset and the system
 firmware is the software payload that brings the system up to a running state.
 Since static launch is the system launch associated with the beginning of the
@@ -77,7 +83,7 @@ to failure. This assessment is referred to as the Strength of Mechanism and for
 trusted mechanism enables for the trustworthiness of that mechanism to be
 quantified.
 
-For software systems there are two system states for which the integrity is
+For software systems, there are two system states for which the integrity is
 critical, when the software is loaded into memory and when the software is
 executing on the hardware. Ensuring that the expected software is load into
 memory is referred to as load-time integrity while ensuring that the software
@@ -105,15 +111,15 @@ adjudication was completed, and 3) the system must be an active participant in
 the key management infrastructure.
 
 A cryptographic hashing assessment does not adjudicate the assessment but
-instead generates evidence of the assessment to be adjudicated independently.
+instead, generates evidence of the assessment to be adjudicated independently.
 The benefits to this approach is that the assessment may be simple such that it
-is able to be implemented as an immutable mechanism, e.g. in hardware.
-Additionally it is possible for the adjudication to be conducted where it
-cannot be tampered with by the TCB. The drawback is that a compromised
-environment will be allowed to execute until an adjudication can be completed.
+may be implemented in an immutable mechanism, e.g. in hardware.  Additionally,
+it is possible for the adjudication to be conducted where it cannot be tampered
+with by the TCB. The drawback is that a compromised environment will be allowed
+to execute until an adjudication can be completed.
 
-Ultimately load-time integrity provides confidence that the correct entity was
-loaded and in the absence of a run-time integrity mechanism assumes, i.e
+Ultimately, load-time integrity provides confidence that the correct entity was
+loaded and in the absence of a run-time integrity mechanism assumes, i.e.
 trusts, that the entity will never become corrupted.
 
 Runtime Integrity
@@ -125,16 +131,16 @@ execution. A more concrete explanation is the taking of an integrity assessment
 of an active process executing on the system at any point during the process'
 execution. Often the load-time integrity of an operating system's user-space,
 i.e. the operating environment, is confused to be the runtime integrity of the
-system since it is an integrity assessment of the "runtime" software. The
+system, since it is an integrity assessment of the "runtime" software. The
 reality is that actual runtime integrity is a very difficult problem and thus
 not very many solutions are public and/or available. One example of a runtime
-integrity solution would be John Hopkins Advanced Physics Labratory's (APL)
+integrity solution would be Johns Hopkins Advanced Physics Laboratory's (APL)
 Linux Kernel Integrity Module (LKIM).
 
 Trust Chains
 ============
 
-Bulding upon the understanding of security mechanisms to establish load-time
+Building upon the understanding of security mechanisms to establish load-time
 integrity of an entity, it is possible to chain together load-time integrity
 assessments to establish the integrity of the whole system. This process is
 known as transitive trust and provides the concept of building a chain of
@@ -147,25 +153,26 @@ RoT for Verification (RTV) and RoT for Measurement (RTM).
 
 A trust chain is itself a mechanism, specifically a mechanism of mechanisms,
 and therefore it too has a Strength of Mechanism. The factors that contribute
-to a trust chain's strength are,
+to the strength of a trust chain are,
 
   - The strength of the chain's RoT
   - The strength of each member of the trust chain
   - The length, i.e. the number of members, of the chain
 
-Therefore to provide the strongest trust chains, they should start with a
+Therefore, to provide the strongest trust chains, they should start with a
 strong RoT and should consist of members being of low complexity and minimizing
-the number of members participating as is possible. In a more colloquial sense,
-a trust chain is only as strong as it weakests link and more links increase
-the probability of a weak link.
+the number of members participating as possible. In a more colloquial sense, a
+trust chain is only as strong as its weakest link, thus more links increase the
+probability of a weak link.
 
 Dynamic Launch Components
 =========================
 
 The TCG architecture for dynamic launch is composed of a component series that
-are used to setup and then carry out the launch. These components work together
-to construct a RTM trust chain that is rooted in the dynamic launch and thus
-commonly referred to as the Dynamic Root of Trust for Measurement (DRTM) chain.
+are used to set up and then carry out the launch. These components work
+together to construct an RTM trust chain that is rooted in the dynamic launch
+and thus commonly referred to as the Dynamic Root of Trust for Measurement
+(DRTM) chain.
 
 What follows is a brief explanation of each component in execution order. A
 subset of these components are what establishes the dynamic launch's trust
@@ -181,26 +188,26 @@ is not a part of the DRTM trust chain.
 Dynamic Launch Event
 --------------------
 
-The dynamic launch event is the event, typically a CPU instruction, that triggers
-the system's dynamic launch mechanism to begin the launch. The dynamic launch
-mechanism is also the RoT for the DRTM trust chain.
+The dynamic launch event is the event, typically a CPU instruction, that
+triggers the system's dynamic launch mechanism to begin the launch. The dynamic
+launch mechanism is also the RoT for the DRTM trust chain.
 
 Dynamic Configuration Environment
 ---------------------------------
 
 The dynamic launch mechanism may have resulted in a reset of a portion of the
-system. To bring the system back to an adequate state for system software the
+system. To bring the system back to an adequate state for system software, the
 dynamic launch will hand over control to the DCE. Prior to handing over this
-control, the dynamic launch will measure the DCE. Once the DCE is complete it
+control, the dynamic launch, will measure the DCE. Once the DCE is complete it
 will proceed to measure and then execute the Dynamic Launch Measured
 Environment (DLME).
 
 Dynamic Launch Measured Environment
 -----------------------------------
 
-The DLME is the first system kernel to have control of the system but may not
+The DLME is the first system kernel to have control of the system, but may not
 be the last. Depending on the usage and configuration, the DLME may be the
-final/target operating system or it may be a boot loader that will load the
+final/target operating system, or it may be a bootloader that will load the
 final/target operating system.
 
 Why DRTM
@@ -210,18 +217,18 @@ It is a fact that DRTM increases the load-time integrity of the system by
 providing a trust chain that has an immutable hardware RoT, uses a limited
 number of small, special purpose code to establish the trust chain that starts
 the target operating system. As mentioned in the Trust Chain section, these are
-the main three factors in driving up the strength of a trust chain. As can been
-seen by the BootHole exploit, which in fact did not effect the integrity of
+the main three factors in driving up the strength of a trust chain. As has been
+seen with the BootHole exploit, which in fact did not affect the integrity of
 DRTM solutions, the sophistication of attacks targeting system launch is at an
-all time high. There is no reason a system should not employ every integrity
+all-time high. There is no reason a system should not employ every integrity
 measure hardware makes available. This is the crux of a defense-in-depth
-approach to system security. In the past the now closed SMI gap was often
-pointed to as invalidating DRTM, which in fact was nothing but a strawman
+approach to system security. In the past, the now closed SMI gap was often
+pointed to as invalidating DRTM, which in fact was nothing but a straw man
 argument. As has continued to be demonstrated, if/when SMM is corrupted it can
 always circumvent all load-time integrity, SRTM and DRTM, because it is a
 run-time integrity problem. Regardless, Intel and AMD have both deployed
 runtime integrity for SMI and SMM which is tied directly to DRTM such that this
-perceived deficiency is now non-existent and the world is moving forward with
+perceived deficiency is now non-existent, and the world is moving forward with
 an expectation that DRTM must be present.
 
 Glossary
@@ -269,7 +276,7 @@ Glossary
     functions can give a trustworthy description of the third group of
     functions, etc. Transitive trust is used to provide a trustworthy
     description of platform characteristics, and also to prove that
-    non-migratable keys are non-migratable
+    non-migratable keys are in fact non-migratable.
 
     - TCG Glossary - https://trustedcomputinggroup.org/wp-content/uploads/TCG-Glossary-V1.1-Rev-1.0.pdf
 

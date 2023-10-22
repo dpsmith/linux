@@ -1,6 +1,12 @@
+.. SPDX-License-Identifier: GPL-2.0
+.. Copyright © 2019-2023 Daniel P. Smith <dpsmith@apertussolutions.com>
+
 ======================
 Secure Launch Overview
 ======================
+
+:Author: Daniel P. Smith
+:Date: October 2023
 
 Overview
 ========
@@ -13,7 +19,7 @@ handle the launch protocol implemented by Intel's special loader, the SINIT
 Authenticated Code Module (ACM [2]_) and remained in memory to manage the SMX
 CPU mode that a dynamic launch would put a system. While it is not precluded
 from being used for doing a late launch, tboot's primary use case was to be
-used as an early launch solution. As a result the TrenchBoot project started
+used as an early launch solution. As a result, the TrenchBoot project started
 the development of Secure Launch kernel feature to provide a more generalized
 approach. The focus of the effort is twofold, the first is to make the Linux
 kernel directly aware of the launch protocol used by Intel, AMD/Hygon, Arm, and
@@ -33,30 +39,30 @@ Goals
 
 The first use case that the TrenchBoot project focused on was the ability for
 the Linux kernel to be started by a dynamic launch, in particular as part of an
-early launch sequence. In this case the dynamic launch will be initiated by any
-boot loader with associated support added to it, for example the first targeted
-boot loader in this case was GRUB2. An integral part of establishing a
+early launch sequence. In this case, the dynamic launch will be initiated by
+any bootloader with associated support added to it, for example the first
+targeted bootloader in this case was GRUB2. An integral part of establishing a
 measurement-based launch integrity involves measuring everything that is
-intended to be executed (kernel image, initrd, etc) and everything that will
-configure that kernel to execute (command line, boot params, etc). Then storing
-those measurements in a protected manner. Both the Intel and AMD dynamic launch
-implementations leverage the Trusted Platform Module (TPM) to store those
-measurements. The TPM itself has been designed such that a dynamic launch
-unlocks a specific set of Platform Configuration Registers (PCR) for holding
-measurement taken during the dynamic launch.  These are referred to as the DRTM
-PCRs, PCRs 17-22. Further details on this process can be found in the
+intended to be executed (kernel image, initrd, etc.) and everything that will
+configure that kernel to execute (command line, boot params, etc.). Then
+storing those measurements in a protected manner. Both the Intel and AMD
+dynamic launch implementations leverage the Trusted Platform Module (TPM) to
+store those measurements. The TPM itself has been designed such that a dynamic
+launch unlocks a specific set of Platform Configuration Registers (PCR) for
+holding measurement taken during the dynamic launch.  These are referred to as
+the DRTM PCRs, PCRs 17-22. Further details on this process can be found in the
 documentation for the GETSEC instruction provided by Intel's TXT and the SKINIT
 instruction provided by AMD's AMD-V. The documentation on these technologies
 can be readily found online; see the `Resources`_ section below for references.
 
 .. note::
-    Currently only Intel TXT is supported in this first release of the Secure
+    Currently, only Intel TXT is supported in this first release of the Secure
     Launch feature. AMD/Hygon SKINIT and Arm support will be added in a
     subsequent release.
 
 To enable the kernel to be launched by GETSEC a stub, the Secure Launch stub,
 must be built into the setup section of the compressed kernel to handle the
-specific state that the dynamic launch process leaves the BSP. Also the Secure
+specific state that the dynamic launch process leaves the BSP. Also, the Secure
 Launch stub must measure everything that is going to be used as early as
 possible. This stub code and subsequent code must also deal with the specific
 state that the dynamic launch leaves the APs as well.
@@ -88,14 +94,14 @@ decisions:
  - Final setup for the Secure Launch kernel is done in a separate Secure
    Launch module that is loaded via a late initcall. This code is responsible
    for extending the measurements taken earlier into the TPM DRTM PCRs and
-   setting up the securityfs interface to allow access the TPM event log and
+   setting up the securityfs interface to allow access to the TPM event log and
    public TXT registers.
  - On the reboot and kexec paths, calls are made to a function to finalize the
    state of the Secure Launch kernel.
 
 The one place where Secure Launch code is mixed directly in with kernel code is
 in the SMP boot code. This is due to the unique state that the dynamic launch
-leaves the APs in. On Intel this involves using a method other than the
+leaves the APs in. On Intel, this involves using a method other than the
 standard INIT-SIPI sequence.
 
 A final note is that originally the extending of the PCRs was completed in the
@@ -106,21 +112,21 @@ independent implementation of the mainline kernel driver. Since the mainline
 driver relies heavily on kernel interfaces not available in the compressed
 kernel, it was not possible to reuse the mainline TPM driver. This resulted in
 the decision to move the extension operations to the Secure Launch module in
-the mainline kernel where the TPM driver would be available.
+the mainline kernel, where the TPM driver would be available.
 
 Basic Boot Flow
 ===============
 
-Outlined here is summary of the boot flow for Secure Launch. A more detailed
+Outlined here is a summary of the boot flow for Secure Launch. A more detailed
 review of Secure Launch process can be found in the Secure Launch
 Specification, a link is located in the `Resources`_ section.
 
-Pre-launch: *Phase where the environment is prepared and configured to initiate the
-secure launch by the boot chain.*
+Pre-launch: *Phase where the environment is prepared and configured to initiate
+the secure launch by the boot chain.*
 
  - The SLRT is initialized and dl_stub is placed in memory.
  - Load the kernel, initrd and ACM [2]_ into memory.
- - Setup the TXT heap and page tables describing the MLE [1]_ per the
+ - Set up the TXT heap and page tables describing the MLE [1]_ per the
    specification.
  - If non-UEFI platform, dl_stub is called.
  - If UEFI platforms, SLRT registered with UEFI and efi-stub called.
@@ -168,7 +174,7 @@ policy details what should be measured and the PCR in which to store the
 measurement. The measurement policy provides the ability to select the
 PCR.DLME_Detail (PCR20) PCR as the location for the DRTM components measured by
 the kernel, e.g. external initrd image. This can then be combined with storing
-the user authority in the PCR.DLME_Authority PCR to seal/attest to different
+the user authority in the PCR.DLME_Authority PCR to seal/attest to different
 variations of platform details/authorities and user details/authorities. An
 example of how this can be achieved was presented in the FOSDEM - 2021 talk
 "Secure Upgrades with DRTM".

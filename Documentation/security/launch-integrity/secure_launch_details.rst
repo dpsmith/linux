@@ -1,6 +1,12 @@
+.. SPDX-License-Identifier: GPL-2.0
+.. Copyright © 2019-2023 Daniel P. Smith <dpsmith@apertussolutions.com>
+
 ===================================
 Secure Launch Config and Interfaces
 ===================================
+
+:Author: Daniel P. Smith
+:Date: October 2023
 
 Configuration
 =============
@@ -13,12 +19,12 @@ A kernel with this option enabled can still be booted using other supported
 methods.
 
 To reduce the Trusted Computing Base (TCB) of the MLE [1]_, the build
-configuration should be pared down as narrowly as one's use case allows.
-The fewer drivers (less active hardware) and features reduces the attack
-surface. E.g. in the extreme, the MLE could only have local disk access
-and no other hardware support. Or only network access for remote attestation.
+configuration should be pared down as narrowly as one's use case allows. The
+fewer drivers (less active hardware) and features reduces the attack surface.
+As an example in the extreme, the MLE could only have local disk access with no
+other hardware supports, except optional network access for remote attestation.
 
-It is also desirable if possible to embed the initrd used with the MLE kernel
+It is also desirable, if possible, to embed the initrd used with the MLE kernel
 image to reduce complexity.
 
 The following are a few important configuration necessities to always consider:
@@ -26,28 +32,39 @@ The following are a few important configuration necessities to always consider:
 KASLR Configuration
 -------------------
 
-Secure Launch does not interoperate with KASLR. If possible, the MLE should be
-built with KASLR disabled::
+Due to Secure Launch hardware implementation details and how KASLR functions,
+Secure Launch is not able to interoperate with KASLR at this time. Attempts to
+enable KASLR in a kernel started using Secure Launch may result in crashes and
+other instabilities at boot. If possible, a kernel being used as an MLE should
+be built with KASLR disabled::
 
   "Processor type and features" -->
       "Build a relocatable kernel" -->
           "Randomize the address of the kernel image (KASLR) [ ]"
 
-This unsets the Kconfig value CONFIG_RANDOMIZE_BASE.
+This action unsets the Kconfig value CONFIG_RANDOMIZE_BASE.
 
-If not possible, KASLR must be disabled on the kernel command line when doing
-a Secure Launch as follows::
+If it is not possible to disable at build time, then it is recommended to force
+KASLR to be disabled using the kernel command line when doing a Secure Launch.
+The kernel parameter is as follows::
 
   nokaslr
+
+.. note::
+    Should KASLR be made capabile of reading/using only the protected page
+    regions set up by the memory protection mechanisms used by the hardware
+    DRTM capability, then it would become possible to use KASLR with Secure
+    Launch.
 
 IOMMU Configuration
 -------------------
 
 When doing a Secure Launch, the IOMMU should always be enabled and the drivers
 loaded. However, IOMMU passthrough mode should never be used. This leaves the
-MLE completely exposed to DMA after the PMR's [2]_ are disabled. The current default
-mode is to use IOMMU in lazy translated mode but strict translated mode is the preferred
-IOMMU mode and this should be selected in the build configuration::
+MLE completely exposed to DMA after the PMR's [2]_ are disabled. The current
+default mode is to use IOMMU in lazy translated mode, but strict translated
+mode is the preferred IOMMU mode and this should be selected in the build
+configuration::
 
   "Device Drivers" -->
       "IOMMU Hardware Support" -->
@@ -69,7 +86,10 @@ and::
               "Enable Intel DMA Remapping Devices by default  [*]"
 
 It is recommended that no other command line options should be set to override
-the defaults above.
+the defaults above. If there is a desire to run an alternate configuration,
+then that configuration should be evaluated for what benefits are attempting to
+be gained against the risks for DMA attacks for which the kernel is likely
+going to be exposed.
 
 Secure Launch Resource Table
 ============================
@@ -77,9 +97,9 @@ Secure Launch Resource Table
 The Secure Launch Resource Table (SLRT) is a platform-agnostic, standard format
 for providing information for the pre-launch environment and to pass
 information to the post-launch environment. The table is populated by one or
-more bootloaders in the boot chain and used by Secure Launch on how to setup
+more bootloaders in the boot chain and used by Secure Launch on how to set up
 the environment during post-launch. The details for the SLRT are documented
-in the TrenchBoot Secure Launch Specifcation [3]_.
+in the TrenchBoot Secure Launch Specification [3]_.
 
 Intel TXT Interface
 ===================
@@ -156,10 +176,10 @@ Value:  0xc0008002
 
 Description:
 
-The Secure Launch code failed to get an access to the TPM hardware interface.
-This is most likely to due to misconfigured hardware or kernel. Ensure the
-TPM chip is enabled and the kernel TPM support is built in (it should not be
-built as a module).
+The Secure Launch code failed to get access to the TPM hardware interface.
+This is most likely due to misconfigured hardware or kernel. Ensure the TPM
+chip is enabled, and the kernel TPM support is built in (it should not be built
+as a module).
 
 ======  ==========================
 Name:   SL_ERROR_TPM_INVALID_LOG20
@@ -168,13 +188,13 @@ Value:  0xc0008003
 
 Description:
 
-The Secure Launch code failed to find a valid event log descriptor for TPM
-version 2.0 or the event log descriptor is malformed. Usually this indicates
-that incompatible versions of the pre-launch environment and the MLE kernel.
-The pre-launch environment and the kernel share a structure in the TXT heap and
-if this structure (the OS-MLE table) is mismatched, this error is often seen.
-This TXT heap area is setup by the pre-launch environment so the issue may
-originate there. It could be the sign of an attempted attack.
+The Secure Launch code failed to find a valid event log descriptor for a
+version 2.0 TPM or the event log descriptor is malformed. Usually this
+indicates there are incompatible versions of the pre-launch environment and the
+MLE kernel. The pre-launch environment and the kernel share a structure in the
+TXT heap and if this structure (the OS-MLE table) is mismatched, this error is
+often seen. This TXT heap area is set up by the pre-launch environment, so the
+issue may originate there. It could also be the sign of an attempted attack.
 
 ======  ===========================
 Name:   SL_ERROR_TPM_LOGGING_FAILED
@@ -186,7 +206,7 @@ Description:
 There was a failed attempt to write a TPM event to the event log early in the
 Secure Launch process. This is likely the result of a malformed TPM event log
 buffer. Formatting of the event log buffer information is done by the
-pre-launch environment so the issue most likely originates there.
+pre-launch environment, so the issue most likely originates there.
 
 ======  ============================
 Name:   SL_ERROR_REGION_STRADDLE_4GB
@@ -195,11 +215,11 @@ Value:  0xc0008005
 
 Description:
 
-During early validation a buffer or region was found to straddle the 4GB
-boundary. Because of the way TXT does DMA memory protection, this is an
-unsafe configuration and is flagged as an error. This is most likely a
-configuration issue in the pre-launch environment. It could also be the sign of
-an attempted attack.
+During early validation, a buffer or region was found to straddle the 4GB
+boundary. Because of the way TXT does DMA memory protection, this is an unsafe
+configuration and is flagged as an error. This is most likely a configuration
+issue in the pre-launch environment. It could also be the sign of an attempted
+attack.
 
 ======  ===================
 Name:   SL_ERROR_TPM_EXTEND
@@ -210,7 +230,7 @@ Description:
 
 There was a failed attempt to extend a TPM PCR in the Secure Launch platform
 module. This is most likely to due to misconfigured hardware or kernel. Ensure
-the TPM chip is enabled and the kernel TPM support is built in (it should not
+the TPM chip is enabled, and the kernel TPM support is built in (it should not
 be built as a module).
 
 ======  ======================
@@ -220,12 +240,12 @@ Value:  0xc0008007
 
 Description:
 
-During early Secure Launch validation an invalid variable MTRR count was found.
-The pre-launch environment passes a number of MSR values to the MLE to restore
-including the MTRRs. The values are restored by the Secure Launch early entry
-point code. After measuring the values supplied by the pre-launch environment,
-a discrepancy was found validating the values. It could be the sign of an
-attempted attack.
+During early Secure Launch validation, an invalid variable MTRR count was
+found. The pre-launch environment passes a number of MSR values to the MLE to
+restore including the MTRRs. The values are restored by the Secure Launch early
+entry point code. After measuring the values supplied by the pre-launch
+environment, a discrepancy was found, validating the values. It could be the
+sign of an attempted attack.
 
 ======  ==========================
 Name:   SL_ERROR_MTRR_INV_DEF_TYPE
@@ -234,7 +254,7 @@ Value:  0xc0008008
 
 Description:
 
-During early Secure Launch validation an invalid default MTRR type was found.
+During early Secure Launch validation, an invalid default MTRR type was found.
 See SL_ERROR_MTRR_INV_VCNT for more details.
 
 ======  ======================
@@ -244,7 +264,7 @@ Value:  0xc0008009
 
 Description:
 
-During early Secure Launch validation an invalid variable MTRR base value was
+During early Secure Launch validation, an invalid variable MTRR base value was
 found. See SL_ERROR_MTRR_INV_VCNT for more details.
 
 ======  ======================
@@ -254,7 +274,7 @@ Value:  0xc000800a
 
 Description:
 
-During early Secure Launch validation an invalid variable MTRR mask value was
+During early Secure Launch validation, an invalid variable MTRR mask value was
 found. See SL_ERROR_MTRR_INV_VCNT for more details.
 
 ======  ========================
@@ -264,8 +284,8 @@ Value:  0xc000800b
 
 Description:
 
-During early Secure Launch validation an invalid miscellaneous enable MSR value
-was found. See SL_ERROR_MTRR_INV_VCNT for more details.
+During early Secure Launch validation, an invalid miscellaneous enable MSR
+value was found. See SL_ERROR_MTRR_INV_VCNT for more details.
 
 ======  =========================
 Name:   SL_ERROR_INV_AP_INTERRUPT
@@ -276,7 +296,7 @@ Description:
 
 The application processors (APs) wait to be woken up by the SMP initialization
 code. The only interrupt that they expect is an NMI; all other interrupts
-should be masked. If an AP gets some other interrupt other than an NMI it will
+should be masked. If an AP gets some other interrupt other than an NMI, it will
 cause this error. This error is very unlikely to occur.
 
 ======  =========================
@@ -319,9 +339,9 @@ Description:
 
 A memory region used by the MLE is above 4GB. In general this is not a problem
 because memory > 4Gb can be protected from DMA. There are certain buffers that
-should never be above 4Gb though and one of these caused the violation. This is
-most likely a configuration issue in the pre-launch environment. It could also
-be the sign of an attempted attack.
+should never be above 4Gb, and one of these caused the violation. This is most
+likely a configuration issue in the pre-launch environment. It could also be
+the sign of an attempted attack.
 
 ======  ==========================
 Name:   SL_ERROR_HEAP_INVALID_DMAR
@@ -363,10 +383,10 @@ Value:  0xc0008014
 
 Description:
 
-On a system with more than 4G of RAM, the high PMR [2]_ base address should be set
-to 4G. This error is due to that not being the case. This PMR value is set by
-the pre-launch environment so the issue most likely originates there. It could also
-be the sign of an attempted attack.
+On a system with more than 4G of RAM, the high PMR [2]_ base address should be
+set to 4G. This error is due to that not being the case. This PMR value is set
+by the pre-launch environment, so the issue most likely originates there. It
+could also be the sign of an attempted attack.
 
 ======  ====================
 Name:   SL_ERROR_HI_PMR_SIZE
@@ -375,10 +395,10 @@ Value:  0xc0008015
 
 Description:
 
-On a system with more than 4G of RAM, the high PMR [2]_ size should be set to cover
-all RAM > 4G. This error is due to that not being the case. This PMR value is
-set by the pre-launch environment so the issue most likely originates there. It
-could also be the sign of an attempted attack.
+On a system with more than 4G of RAM, the high PMR [2]_ size should be set to
+cover all RAM > 4G. This error is due to that not being the case. This PMR
+value is set by the pre-launch environment, so the issue most likely originates
+there. It could also be the sign of an attempted attack.
 
 ======  ====================
 Name:   SL_ERROR_LO_PMR_BASE
@@ -387,10 +407,10 @@ Value:  0xc0008016
 
 Description:
 
-The low PMR [2]_ base should always be set to address zero. This error is due to
-that not being the case. This PMR value is set by the pre-launch environment
-so the issue most likely originates there. It could also be the sign of an attempted
-attack.
+The low PMR [2]_ base should always be set to address zero. This error is due
+to that not being the case. This PMR value is set by the pre-launch environment
+so the issue most likely originates there. It could also be the sign of an
+attempted attack.
 
 ======  ====================
 Name:   SL_ERROR_LO_PMR_MLE
@@ -399,9 +419,9 @@ Value:  0xc0008017
 
 Description:
 
-This error indicates the MLE image is not covered by the low PMR [2]_ range. The
-PMR values are set by the pre-launch environment so the issue most likely originates
-there. It could also be the sign of an attempted attack.
+This error indicates the MLE image is not covered by the low PMR [2]_ range.
+The PMR values are set by the pre-launch environment, so the issue most likely
+originates there. It could also be the sign of an attempted attack.
 
 ======  =======================
 Name:   SL_ERROR_INITRD_TOO_BIG
@@ -420,11 +440,11 @@ Value:  0xc0008019
 
 Description:
 
-During a TXT heap walk an invalid/zero next table offset value was found. This
+During a TXT heap walk, an invalid/zero next table offset value was found. This
 indicates the TXT heap is malformed. The TXT heap is initialized by the
-pre-launch environment so the issue most likely originates there. It could also
-be a sign of an attempted attack. In addition, ACM is also responsible for
-manipulating parts of the TXT heap so the issue could be due to a bug in the
+pre-launch environment, so the issue most likely originates there. It could
+also be a sign of an attempted attack. In addition, ACM is also responsible for
+manipulating parts of the TXT heap, so the issue could be due to a bug in the
 platform's ACM module.
 
 ======  =============================
@@ -435,8 +455,8 @@ Value:  0xc000801a
 Description:
 
 The AP wake block buffer passed to the MLE via the OS-MLE TXT heap table is not
-large enough. This value is set by the pre-launch environment so the issue most
-likely originates there. It also could be the sign of an attempted attack.
+large enough. This value is set by the pre-launch environment, so the issue
+most likely originates there. It also could be the sign of an attempted attack.
 
 ======  ===========================
 Name:   SL_ERROR_MLE_BUFFER_OVERLAP
@@ -447,8 +467,8 @@ Description:
 
 One of the buffers passed to the MLE via the OS-MLE TXT heap table overlaps
 with the MLE image in memory. This value is set by the pre-launch environment
-so the issue most likely originates there. It could also be the sign of an attempted
-attack.
+so the issue most likely originates there. It could also be the sign of an
+attempted attack.
 
 ======  ==========================
 Name:   SL_ERROR_BUFFER_BEYOND_PMR
@@ -458,8 +478,8 @@ Value:  0xc000801c
 Description:
 
 One of the buffers passed to the MLE via the OS-MLE TXT heap table is not
-protected by a PMR. This value is set by the pre-launch environment so the
-issue most likey  originates there. It could also be the sign of an attempted
+protected by a PMR. This value is set by the pre-launch environment, so the
+issue most likely originates there. It could also be the sign of an attempted
 attack.
 
 ======  =============================
@@ -470,7 +490,7 @@ Value:  0xc000801d
 Description:
 
 The version of the OS-SINIT TXT heap table is bad. It must be 6 or greater.
-This value is set by the pre-launch environment so the issue most likely
+This value is set by the pre-launch environment, so the issue most likely
 originates there. It could also be the sign of an attempted attack. It is also
 possible though very unlikely that the platform is so old that the ACM being
 used requires an unsupported version.
@@ -524,8 +544,8 @@ Value:  0xc0008022
 
 Description:
 
-The Secure Launch Resource Table is invalid or malformed and is unusable.
-This implies the pre-launch code did not properly setup the SLRT.
+The Secure Launch Resource Table is invalid or malformed and is unusable. This
+implies the pre-launch code did not properly set up the SLRT.
 
 ======  ===========================
 Name:   SL_ERROR_SLRT_MISSING_ENTRY
@@ -534,8 +554,8 @@ Value:  0xc0008023
 
 Description:
 
-The Secure Launch Resource Table is missing a required entry within it.
-This implies the pre-launch code did not properly setup the SLRT.
+The Secure Launch Resource Table is missing a required entry within it. This
+implies the pre-launch code did not properly set up the SLRT.
 
 ======  =================
 Name:   SL_ERROR_SLRT_MAP
