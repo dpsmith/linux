@@ -198,7 +198,7 @@ static inline void *slr_end_of_entrys(struct slr_table *table)
 
 static inline struct slr_entry_hdr *
 slr_next_entry(struct slr_table *table,
-		struct slr_entry_hdr *curr)
+	       struct slr_entry_hdr *curr)
 {
 	struct slr_entry_hdr *next = (struct slr_entry_hdr *)
 				((u8 *)curr + curr->size);
