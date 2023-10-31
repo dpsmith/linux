@@ -530,12 +530,16 @@ static inline void smx_getsec_sexit(void)
 		      : : "a" (SMX_X86_GETSEC_SEXIT));
 }
 
+/*
+ * Used during kexec and on reboot paths to finalize the TXT state
+ * and do an SEXIT exiting the DRTM and disabling SMX mode.
+ */
 void slaunch_finalize(int do_sexit)
 {
 	u64 one = TXT_REGVALUE_ONE, val;
 	void __iomem *config;
 
-	if ((slaunch_get_flags() & (SL_FLAG_ACTIVE|SL_FLAG_ARCH_TXT)) !=
+	if ((slaunch_get_flags() & (SL_FLAG_ACTIVE | SL_FLAG_ARCH_TXT)) !=
 	    (SL_FLAG_ACTIVE | SL_FLAG_ARCH_TXT))
 		return;
 
