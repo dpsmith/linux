@@ -81,8 +81,8 @@
 #define TXT_REGVALUE_ONE		0x1ULL
 
 /* TXTCR_STS status bits */
-#define TXT_SENTER_DONE_STS		(1<<0)
-#define TXT_SEXIT_DONE_STS		(1<<1)
+#define TXT_SENTER_DONE_STS		BIT(0)
+#define TXT_SEXIT_DONE_STS		BIT(1)
 
 /*
  * SINIT/MLE Capabilities Field Bit Definitions
@@ -502,12 +502,12 @@ static inline int tpm20_log_event(struct txt_heap_event_log_pointer2_1_element *
 /*
  * External functions avalailable in mainline kernel.
  */
-extern void slaunch_setup_txt(void);
-extern void slaunch_fixup_jump_vector(void);
-extern u32 slaunch_get_flags(void);
-extern struct sl_ap_wake_info *slaunch_get_ap_wake_info(void);
-extern struct acpi_table_header *slaunch_get_dmar_table(struct acpi_table_header *dmar);
-extern void __noreturn slaunch_txt_reset(void __iomem *txt,
+void slaunch_setup_txt(void);
+void slaunch_fixup_jump_vector(void);
+u32 slaunch_get_flags(void);
+struct sl_ap_wake_info *slaunch_get_ap_wake_info(void);
+struct acpi_table_header *slaunch_get_dmar_table(struct acpi_table_header *dmar);
+void __noreturn slaunch_txt_reset(void __iomem *txt,
 					 const char *msg, u64 error);
 extern void slaunch_finalize(int do_sexit);
 
