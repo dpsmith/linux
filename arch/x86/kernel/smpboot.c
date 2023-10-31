@@ -979,6 +979,15 @@ int common_cpu_up(unsigned int cpu, struct task_struct *idle)
 
 #ifdef CONFIG_SECURE_LAUNCH
 
+static bool slaunch_is_txt_launch(void)
+{
+	if ((slaunch_get_flags() & (SL_FLAG_ACTIVE|SL_FLAG_ARCH_TXT)) ==
+	    (SL_FLAG_ACTIVE | SL_FLAG_ARCH_TXT))
+		return true;
+
+	return false;
+}
+
 /*
  * TXT AP startup is quite different than normal. The APs cannot have #INIT
  * asserted on them or receive SIPIs. The early Secure Launch code has parked
@@ -1006,6 +1015,11 @@ static void slaunch_wakeup_cpu_from_txt(int cpu, int apicid)
 }
 
 #else
+
+static inline bool slaunch_is_txt_launch(void)
+{
+	return false;
+}
 
 static inline void slaunch_wakeup_cpu_from_txt(int cpu, int apicid)
 {
@@ -1073,8 +1087,7 @@ static int do_boot_cpu(int apicid, int cpu, struct task_struct *idle)
 	 * Otherwise,
 	 * - Use an INIT boot APIC message
 	 */
-	if ((slaunch_get_flags() & (SL_FLAG_ACTIVE|SL_FLAG_ARCH_TXT)) ==
-	   (SL_FLAG_ACTIVE|SL_FLAG_ARCH_TXT))
+	if (slaunch_is_txt_launch())
 		slaunch_wakeup_cpu_from_txt(cpu, apicid);
 	else if (apic->wakeup_secondary_cpu_64)
 		ret = apic->wakeup_secondary_cpu_64(apicid, start_ip);
