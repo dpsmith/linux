@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Secure Launch late validation/setup, securityfs exposure and
- * finalization support.
+ * Secure Launch late validation/setup, securityfs exposure and finalization.
  *
  * Copyright (c) 2022 Apertus Solutions, LLC
  * Copyright (c) 2021 Assured Information Security, Inc.
  * Copyright (c) 2022, Oracle and/or its affiliates.
  *
- * Author(s):
- *     Daniel P. Smith <dpsmith@apertussolutions.com>
- *     Garnet T. Grimm <grimmg@ainfosec.com>
+ * Co-developed-by: Garnet T. Grimm <grimmg@ainfosec.com>
+ * Signed-off-by: Garnet T. Grimm <grimmg@ainfosec.com>
+ * Signed-off-by: Daniel P. Smith <dpsmith@apertussolutions.com>
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
@@ -28,19 +27,24 @@
 #include <linux/slr_table.h>
 #include <linux/slaunch.h>
 
+/*
+ * The macro DECLARE_TXT_PUB_READ_U is used to read values from the TXT
+ * public registers as unsigned values.
+ */
 #define DECLARE_TXT_PUB_READ_U(size, fmt, msg_size)			\
 static ssize_t txt_pub_read_u##size(unsigned int offset,		\
 		loff_t *read_offset,					\
 		size_t read_len,					\
 		char __user *buf)					\
 {									\
-	void __iomem *txt;						\
 	char msg_buffer[msg_size];					\
 	u##size reg_value = 0;						\
+	void __iomem *txt;						\
+									\
 	txt = ioremap(TXT_PUB_CONFIG_REGS_BASE,				\
 			TXT_NR_CONFIG_PAGES * PAGE_SIZE);		\
-	if (!txt)						\
-		return -EFAULT;					\
+	if (!txt)							\
+		return -EFAULT;						\
 	memcpy_fromio(&reg_value, txt + offset, sizeof(u##size));	\
 	iounmap(txt);							\
 	snprintf(msg_buffer, msg_size, fmt, reg_value);			\
@@ -80,9 +84,9 @@ struct memfile {
 	size_t size;
 };
 
-static struct memfile sl_evtlog = {"eventlog", 0, 0};
+static struct memfile sl_evtlog = {"eventlog", NULL, 0};
 static void *txt_heap;
-static struct txt_heap_event_log_pointer2_1_element __iomem *evtlog20;
+static struct txt_heap_event_log_pointer2_1_element *evtlog20;
 static DEFINE_MUTEX(sl_evt_log_mutex);
 
 static ssize_t sl_evtlog_read(struct file *file, char __user *buf,
@@ -102,7 +106,7 @@ static ssize_t sl_evtlog_read(struct file *file, char __user *buf,
 }
 
 static ssize_t sl_evtlog_write(struct file *file, const char __user *buf,
-				size_t datalen, loff_t *ppos)
+			       size_t datalen, loff_t *ppos)
 {
 	ssize_t result;
 	char *data;
@@ -189,14 +193,12 @@ static long slaunch_expose_securityfs(void)
 				goto remove_files;
 			}
 		}
-
 	}
 
-	if (sl_evtlog.addr > 0) {
-		event_file = securityfs_create_file(
-					sl_evtlog.name, 0440,
-					slaunch_dir, NULL,
-					&sl_evtlog_ops);
+	if (sl_evtlog.addr) {
+		event_file = securityfs_create_file(sl_evtlog.name, 0440,
+						    slaunch_dir, NULL,
+						    &sl_evtlog_ops);
 		if (IS_ERR(event_file)) {
 			ret = PTR_ERR(event_file);
 			goto remove_files;
@@ -211,6 +213,7 @@ remove_files:
 			securityfs_remove(txt_entries[i]);
 		securityfs_remove(txt_dir);
 	}
+
 remove_slaunch:
 	securityfs_remove(slaunch_dir);
 
@@ -258,8 +261,8 @@ static void slaunch_intel_evtlog(void __iomem *txt)
 	txt_heap = memremap(base, size, MEMREMAP_WB);
 	if (!txt_heap)
 		slaunch_txt_reset(txt,
-			"Error failed to memremap TXT heap\n",
-			SL_ERROR_HEAP_MAP);
+				  "Error failed to memremap TXT heap\n",
+				  SL_ERROR_HEAP_MAP);
 
 	params = (struct txt_os_mle_data *)txt_os_mle_data_start(txt_heap);
 
@@ -267,31 +270,30 @@ static void slaunch_intel_evtlog(void __iomem *txt)
 	slrt = memremap(params->slrt, sizeof(*slrt), MEMREMAP_WB);
 	if (!slrt)
 		slaunch_txt_reset(txt,
-			"Error failed to memremap SLR Table\n",
-			SL_ERROR_SLRT_MAP);
+				  "Error failed to memremap SLR Table\n",
+				  SL_ERROR_SLRT_MAP);
 	size = slrt->size;
 	memunmap(slrt);
 
 	slrt = memremap(params->slrt, size, MEMREMAP_WB);
 	if (!slrt)
 		slaunch_txt_reset(txt,
-			"Error failed to memremap SLR Table\n",
-			SL_ERROR_SLRT_MAP);
+				  "Error failed to memremap SLR Table\n",
+				  SL_ERROR_SLRT_MAP);
 
-	log_info = (struct slr_entry_log_info *)
-			slr_next_entry_by_tag(slrt, NULL, SLR_ENTRY_LOG_INFO);
+	log_info = (struct slr_entry_log_info *)slr_next_entry_by_tag(slrt, NULL, SLR_ENTRY_LOG_INFO);
 	if (!log_info)
 		slaunch_txt_reset(txt,
-			"Error failed to memremap SLR Table\n",
-			SL_ERROR_SLRT_MISSING_ENTRY);
+				  "Error failed to memremap SLR Table\n",
+				  SL_ERROR_SLRT_MISSING_ENTRY);
 
 	sl_evtlog.size = log_info->size;
 	sl_evtlog.addr = memremap(log_info->addr, log_info->size,
 				  MEMREMAP_WB);
 	if (!sl_evtlog.addr)
 		slaunch_txt_reset(txt,
-			"Error failed to memremap TPM event log\n",
-			SL_ERROR_EVENTLOG_MAP);
+				  "Error failed to memremap TPM event log\n",
+				  SL_ERROR_EVENTLOG_MAP);
 
 	memunmap(slrt);
 
@@ -311,15 +313,14 @@ static void slaunch_intel_evtlog(void __iomem *txt)
 	 */
 	if (!evtlog20)
 		slaunch_txt_reset(txt,
-			"Error failed to find TPM20 event log element\n",
-			SL_ERROR_TPM_INVALID_LOG20);
+				  "Error failed to find TPM20 event log element\n",
+				  SL_ERROR_TPM_INVALID_LOG20);
 }
 
 static void slaunch_tpm20_extend_event(struct tpm_chip *tpm, void __iomem *txt,
 				       struct tcg_pcr_event2_head *event)
 {
-	u16 *alg_id_field = (u16 *)((u8 *)event +
-				    sizeof(struct tcg_pcr_event2_head));
+	u16 *alg_id_field = (u16 *)((u8 *)event + sizeof(struct tcg_pcr_event2_head));
 	struct tpm_digest *digests;
 	u8 *dptr;
 	int ret;
@@ -329,12 +330,11 @@ static void slaunch_tpm20_extend_event(struct tpm_chip *tpm, void __iomem *txt,
 			  GFP_KERNEL);
 	if (!digests)
 		slaunch_txt_reset(txt,
-			"Failed to allocate array of digests\n",
-			SL_ERROR_GENERIC);
+				  "Failed to allocate array of digests\n",
+				  SL_ERROR_GENERIC);
 
 	for (i = 0; i < tpm->nr_allocated_banks; i++)
 		digests[i].alg_id = tpm->allocated_banks[i].alg_id;
-
 
 	/* Early SL code ensured there was a max count of 2 digests */
 	for (i = 0; i < event->count; i++) {
@@ -366,8 +366,8 @@ static void slaunch_tpm20_extend_event(struct tpm_chip *tpm, void __iomem *txt,
 	if (ret) {
 		pr_err("Error extending TPM20 PCR, result: %d\n", ret);
 		slaunch_txt_reset(txt,
-			"Failed to extend TPM20 PCR\n",
-			SL_ERROR_TPM_EXTEND);
+				  "Failed to extend TPM20 PCR\n",
+				  SL_ERROR_TPM_EXTEND);
 	}
 
 	kfree(digests);
@@ -391,8 +391,8 @@ static void slaunch_tpm20_extend(struct tpm_chip *tpm, void __iomem *txt)
 		size = __calc_tpm2_event_size(event, event_header, false);
 		if (!size)
 			slaunch_txt_reset(txt,
-				"TPM20 invalid event in event log\n",
-				SL_ERROR_TPM_INVALID_EVENT);
+					  "TPM20 invalid event in event log\n",
+					  SL_ERROR_TPM_INVALID_EVENT);
 
 		/*
 		 * Marker events indicate where the Secure Launch early stub
@@ -415,8 +415,8 @@ next:
 
 	if (!start || !end)
 		slaunch_txt_reset(txt,
-			"Missing start or end events for extending TPM20 PCRs\n",
-			SL_ERROR_TPM_EXTEND);
+				  "Missing start or end events for extending TPM20 PCRs\n",
+				  SL_ERROR_TPM_EXTEND);
 }
 
 static void slaunch_tpm12_extend(struct tpm_chip *tpm, void __iomem *txt)
@@ -456,8 +456,8 @@ static void slaunch_tpm12_extend(struct tpm_chip *tpm, void __iomem *txt)
 			if (ret) {
 				pr_err("Error extending TPM12 PCR, result: %d\n", ret);
 				slaunch_txt_reset(txt,
-					"Failed to extend TPM12 PCR\n",
-					SL_ERROR_TPM_EXTEND);
+						  "Failed to extend TPM12 PCR\n",
+						  SL_ERROR_TPM_EXTEND);
 			}
 		}
 
@@ -467,8 +467,8 @@ next:
 
 	if (!start || !end)
 		slaunch_txt_reset(txt,
-			"Missing start or end events for extending TPM12 PCRs\n",
-			SL_ERROR_TPM_EXTEND);
+				  "Missing start or end events for extending TPM12 PCRs\n",
+				  SL_ERROR_TPM_EXTEND);
 }
 
 static void slaunch_pcr_extend(void __iomem *txt)
@@ -478,8 +478,8 @@ static void slaunch_pcr_extend(void __iomem *txt)
 	tpm = tpm_default_chip();
 	if (!tpm)
 		slaunch_txt_reset(txt,
-			"Could not get default TPM chip\n",
-			SL_ERROR_TPM_INIT);
+				  "Could not get default TPM chip\n",
+				  SL_ERROR_TPM_INIT);
 	if (evtlog20)
 		slaunch_tpm20_extend(tpm, txt);
 	else
@@ -492,7 +492,7 @@ static int __init slaunch_module_init(void)
 
 	/* Check to see if Secure Launch happened */
 	if ((slaunch_get_flags() & (SL_FLAG_ACTIVE|SL_FLAG_ARCH_TXT)) !=
-	    (SL_FLAG_ACTIVE|SL_FLAG_ARCH_TXT))
+	    (SL_FLAG_ACTIVE | SL_FLAG_ARCH_TXT))
 		return 0;
 
 	txt = ioremap(TXT_PRIV_CONFIG_REGS_BASE, TXT_NR_CONFIG_PAGES *
@@ -502,9 +502,7 @@ static int __init slaunch_module_init(void)
 
 	/* Only Intel TXT is supported at this point */
 	slaunch_intel_evtlog(txt);
-
 	slaunch_pcr_extend(txt);
-
 	iounmap(txt);
 
 	return slaunch_expose_securityfs();
@@ -516,5 +514,4 @@ static void __exit slaunch_module_exit(void)
 }
 
 late_initcall(slaunch_module_init);
-
 __exitcall(slaunch_module_exit);
