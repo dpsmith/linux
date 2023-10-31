@@ -11,7 +11,6 @@
 
 #include "early_sha1.h"
 
-#define SHA1_DISABLE_EXPORT
 #include "../../../../lib/crypto/sha1.c"
 
 /* The SHA1 implementation in lib/sha1.c was written to get the workspace
