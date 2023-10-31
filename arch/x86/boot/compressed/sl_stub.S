@@ -27,8 +27,9 @@
 #define IDT_VECTOR_HI_BITS	6
 
 /*
- * See the comment in head_64.S for detailed informatoin on what this macro
- * is used for.
+ * See the comment in head_64.S for detailed information on what this macro
+ * and others like it are used for. The comment appears right at the top of
+ * the file.
  */
 #define rva(X) ((X) - sl_stub_entry)
 
@@ -611,9 +612,9 @@ sl_txt_ap_wake_begin:
 	jz	1b
 
 	/*
-	 * This is the long absolute jump to the 32b Secure Launch protected
-	 * mode stub code in the rmpiggy. The jump address will be fixed in
-	 * the SMP boot code when the first AP is brought up. This whole area
+	 * This is the long absolute jump to the 32b Secure Launch protected mode stub
+	 * code in sl_trampoline_start32() in the rmpiggy. The jump address will be
+	 * fixed in the SMP boot code when the first AP is brought up. This whole area
 	 * is provided and protected in the memory map by the prelaunch code.
 	 */
 	.byte	0xea

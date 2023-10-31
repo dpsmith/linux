@@ -42,7 +42,7 @@ static void *evtlog_base;
 static u32 evtlog_size;
 static struct txt_heap_event_log_pointer2_1_element *log20_elem;
 static u32 tpm_log_ver = SL_TPM12_LOG;
-struct tcg_efi_specid_event_algs tpm_algs[SL_TPM20_MAX_ALGS] = {0};
+static struct tcg_efi_specid_event_algs tpm_algs[SL_TPM20_MAX_ALGS] = {0};
 
 extern u32 sl_cpu_type;
 extern u32 sl_mle_start;
@@ -117,8 +117,7 @@ static void sl_check_pmr_coverage(void *base, u32 size, bool allow_hi)
 	txt_heap = (void *)sl_txt_read(TXT_CR_HEAP_BASE);
 	os_sinit_data = txt_os_sinit_data_start(txt_heap);
 
-	if ((end >= (void *)0x100000000ULL) &&
-	    (base < (void *)0x100000000ULL))
+	if ((end >= (void *)0x100000000ULL) && (base < (void *)0x100000000ULL))
 		sl_txt_reset(SL_ERROR_REGION_STRADDLE_4GB);
 
 	/*
@@ -126,14 +125,14 @@ static void sl_check_pmr_coverage(void *base, u32 size, bool allow_hi)
 	 * all memory above 4G. At this point the code can only check that
 	 * regions are within the hi PMR but that is sufficient.
 	 */
-	if ((end > (void *)0x100000000ULL) &&
-	    (base >= (void *)0x100000000ULL)) {
+	if ((end > (void *)0x100000000ULL) && (base >= (void *)0x100000000ULL)) {
 		if (allow_hi) {
 			if (end >= (void *)(os_sinit_data->vtd_pmr_hi_base +
 					   os_sinit_data->vtd_pmr_hi_size))
 				sl_txt_reset(SL_ERROR_BUFFER_BEYOND_PMR);
-		} else
+		} else {
 			sl_txt_reset(SL_ERROR_REGION_ABOVE_4GB);
+		}
 	}
 
 	if (end >= (void *)os_sinit_data->vtd_pmr_lo_size)
@@ -154,7 +153,7 @@ static void sl_txt_validate_msrs(struct txt_os_mle_data *os_mle_data)
 	u32 vcnt, i;
 
 	txt_info = (struct slr_entry_intel_info *)os_mle_data->txt_info;
-	saved_bsp_mtrrs = &(txt_info->saved_bsp_mtrrs);
+	saved_bsp_mtrrs = &txt_info->saved_bsp_mtrrs;
 
 	mtrr_caps = sl_rdmsr(MSR_MTRRcap);
 	vcnt = (u32)(mtrr_caps & CAPS_VARIABLE_MTRR_COUNT_MASK);
@@ -182,14 +181,14 @@ static void sl_txt_validate_msrs(struct txt_os_mle_data *os_mle_data)
 		sl_txt_reset(SL_ERROR_MSR_INV_MISC_EN);
 }
 
-static void sl_find_event_log(struct slr_table *slrt)
+static void sl_find_drtm_event_log(struct slr_table *slrt)
 {
 	struct txt_os_sinit_data *os_sinit_data;
 	struct slr_entry_log_info *log_info;
 	void *txt_heap;
 
 	log_info = (struct slr_entry_log_info *)
-			slr_next_entry_by_tag(slrt, NULL, SLR_ENTRY_LOG_INFO);
+		    slr_next_entry_by_tag(slrt, NULL, SLR_ENTRY_LOG_INFO);
 	if (!log_info)
 		sl_txt_reset(SL_ERROR_SLRT_MISSING_ENTRY);
 
@@ -241,12 +240,10 @@ static void sl_validate_event_log_buffer(void)
 	 * This check is to ensure the event log buffer does not overlap with
 	 * the MLE image.
 	 */
-	if ((evtlog_base >= mle_end) &&
-	    (evtlog_end > mle_end))
+	if (evtlog_base >= mle_end && evtlog_end > mle_end)
 		goto pmr_check; /* above */
 
-	if ((evtlog_end <= mle_base) &&
-	    (evtlog_base < mle_base))
+	if (evtlog_end <= mle_base && evtlog_base < mle_base)
 		goto pmr_check; /* below */
 
 	sl_txt_reset(SL_ERROR_MLE_BUFFER_OVERLAP);
@@ -256,8 +253,7 @@ pmr_check:
 	 * The TXT heap is protected by the DPR. If the TPM event log is
 	 * inside the TXT heap, there is no need for a PMR check.
 	 */
-	if ((evtlog_base > txt_heap) &&
-	    (evtlog_end < txt_end))
+	if (evtlog_base > txt_heap && evtlog_end < txt_end)
 		return;
 
 	sl_check_pmr_coverage(evtlog_base, evtlog_size, true);
@@ -355,19 +351,18 @@ static void sl_tpm20_log_event(u32 pcr, u32 event_type,
 			memcpy(dgst_ptr, &sha1_hash[0], SHA1_DIGEST_SIZE);
 			total_size += SHA1_DIGEST_SIZE + sizeof(u16);
 			alg_ptr = (u16 *)((u8 *)alg_ptr + SHA1_DIGEST_SIZE + sizeof(u16));
-		} else
+		} else {
 			sl_txt_reset(SL_ERROR_TPM_UNKNOWN_DIGEST);
+		}
 	}
 
 	event = (struct tcg_event_field *)(log_buf + total_size);
 	event->event_size = event_size;
 	if (event_size > 0)
-		memcpy((u8 *)event + sizeof(struct tcg_event_field),
-		       event_data, event_size);
+		memcpy((u8 *)event + sizeof(struct tcg_event_field), event_data, event_size);
 	total_size += sizeof(struct tcg_event_field) + event_size;
 
-	if (tpm20_log_event(log20_elem, evtlog_base, evtlog_size,
-	    total_size, &log_buf[0]))
+	if (tpm20_log_event(log20_elem, evtlog_base, evtlog_size, total_size, &log_buf[0]))
 		sl_txt_reset(SL_ERROR_TPM_LOGGING_FAILED);
 }
 
@@ -395,8 +390,7 @@ static struct setup_data *sl_handle_setup_data(struct setup_data *curr,
 
 	/* SETUP_INDIRECT instances have to be handled differently */
 	if (curr->type == SETUP_INDIRECT) {
-		ind = (struct setup_indirect *)
-			((u8 *)curr + offsetof(struct setup_data, data));
+		ind = (struct setup_indirect *)((u8 *)curr + offsetof(struct setup_data, data));
 
 		sl_check_pmr_coverage((void *)ind->addr, ind->len, true);
 
@@ -442,8 +436,7 @@ static void sl_extend_slrt(struct slr_policy_entry *entry)
 	 * addresses and sizes.
 	 */
 	if (slrt->revision == 1) {
-		intel_info = (struct slr_entry_intel_info *)
-				slr_next_entry_by_tag(slrt, NULL, SLR_ENTRY_INTEL_INFO);
+		intel_info = (struct slr_entry_intel_info *)slr_next_entry_by_tag(slrt, NULL, SLR_ENTRY_INTEL_INFO);
 		if (!intel_info)
 			sl_txt_reset(SL_ERROR_SLRT_MISSING_ENTRY);
 
@@ -473,16 +466,15 @@ static void sl_process_extend_policy(struct slr_table *slrt)
 {
 	struct slr_entry_policy *policy;
 	struct slr_policy_entry *entry;
-	u16 i = 0;
+	u16 i;
 
-	policy =(struct slr_entry_policy *)
-		slr_next_entry_by_tag(slrt, NULL, SLR_ENTRY_ENTRY_POLICY);
+	policy = (struct slr_entry_policy *)slr_next_entry_by_tag(slrt, NULL, SLR_ENTRY_ENTRY_POLICY);
 	if (!policy)
 		sl_txt_reset(SL_ERROR_SLRT_MISSING_ENTRY);
 
 	entry = (struct slr_policy_entry *)((u8 *)policy + sizeof(*policy));
 
-	for ( ; i < policy->nr_entries; i++, entry++) {
+	for (i = 0; i < policy->nr_entries; i++, entry++) {
 		switch (entry->entity_type) {
 		case SLR_ET_SETUP_DATA:
 			sl_extend_setup_data(entry);
@@ -509,8 +501,7 @@ static void sl_process_extend_uefi_config(struct slr_table *slrt)
 	struct slr_uefi_cfg_entry *uefi_entry;
 	u64 i;
 
-	uefi_config =(struct slr_entry_uefi_config *)
-		slr_next_entry_by_tag(slrt, NULL, SLR_ENTRY_UEFI_CONFIG);
+	uefi_config =(struct slr_entry_uefi_config *)slr_next_entry_by_tag(slrt, NULL, SLR_ENTRY_UEFI_CONFIG);
 
 	/* Optionally here depending on how SL kernel was booted */
 	if (!uefi_config)
@@ -518,7 +509,7 @@ static void sl_process_extend_uefi_config(struct slr_table *slrt)
 
 	uefi_entry = (struct slr_uefi_cfg_entry *)((u8 *)uefi_config + sizeof(*uefi_config));
 
-	for ( ; i < uefi_config->nr_entries; i++, uefi_entry++) {
+	for (i = 0; i < uefi_config->nr_entries; i++, uefi_entry++) {
 		sl_tpm_extend_evtlog(uefi_entry->pcr, TXT_EVTYPE_SLAUNCH,
 				     (void *)uefi_entry->cfg, uefi_entry->size,
 				     uefi_entry->evt_info);
@@ -554,7 +545,7 @@ asmlinkage __visible void sl_main(void *bootparams)
 	slrt = sl_locate_and_validate_slrt();
 
 	/* Locate the TPM event log. */
-	sl_find_event_log(slrt);
+	sl_find_drtm_event_log(slrt);
 
 	/* Validate the location of the event log buffer before using it */
 	sl_validate_event_log_buffer();
