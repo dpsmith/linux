@@ -22,35 +22,51 @@
 #include <linux/slr_table.h>
 #include <linux/slaunch.h>
 
-static u32 sl_flags;
-static struct sl_ap_wake_info ap_wake_info;
-static u64 evtlog_addr;
-static u32 evtlog_size;
-static u64 vtd_pmr_lo_size;
+static u32 sl_flags __ro_after_init;
+static struct sl_ap_wake_info ap_wake_info __ro_after_init;
+static u64 evtlog_addr __ro_after_init;
+static u32 evtlog_size __ro_after_init;
+static u64 vtd_pmr_lo_size __ro_after_init;
 
 /* This should be plenty of room */
 static u8 txt_dmar[PAGE_SIZE] __aligned(16);
 
+/*
+ * Get the Secure Launch flags that indicate what kind of launch is being done.
+ * E.g. a TXT launch is in progress or no Secure Launch is happening.
+ */
 u32 slaunch_get_flags(void)
 {
 	return sl_flags;
 }
-EXPORT_SYMBOL(slaunch_get_flags);
 
+/*
+ * Return the AP wakeup information used in the SMP boot code to start up
+ * the APs that are parked using MONITOR/MWAIT.
+ */
 struct sl_ap_wake_info *slaunch_get_ap_wake_info(void)
 {
 	return &ap_wake_info;
 }
 
+/*
+ * On Intel platforms, TXT passes a safe copy of the DMAR ACPI table to the
+ * DRTM. The DRTM is supposed to use this instead of the one found in the
+ * ACPI tables.
+ */
 struct acpi_table_header *slaunch_get_dmar_table(struct acpi_table_header *dmar)
 {
 	/* The DMAR is only stashed and provided via TXT on Intel systems */
 	if (memcmp(txt_dmar, "DMAR", 4))
 		return dmar;
 
-	return (struct acpi_table_header *)(&txt_dmar[0]);
+	return (struct acpi_table_header *)(txt_dmar);
 }
 
+/*
+ * If running within a TXT established DRTM, this is the proper way to reset
+ * the system if a failure occurs or a security issue is found.
+ */
 void __noreturn slaunch_txt_reset(void __iomem *txt,
 				  const char *msg, u64 error)
 {
@@ -88,9 +104,8 @@ static void __init *txt_early_get_heap_table(void __iomem *txt, u32 type,
 	int i;
 
 	if (type > TXT_SINIT_TABLE_MAX)
-		slaunch_txt_reset(txt,
-			"Error invalid table type for early heap walk\n",
-			SL_ERROR_HEAP_WALK);
+		slaunch_txt_reset(txt, "Error invalid table type for early heap walk\n",
+				  SL_ERROR_HEAP_WALK);
 
 	memcpy_fromio(&base, txt + TXT_CR_HEAP_BASE, sizeof(base));
 	memcpy_fromio(&size, txt + TXT_CR_HEAP_SIZE, sizeof(size));
@@ -100,9 +115,8 @@ static void __init *txt_early_get_heap_table(void __iomem *txt, u32 type,
 		base += offset;
 		heap = early_memremap(base, sizeof(u64));
 		if (!heap)
-			slaunch_txt_reset(txt,
-				"Error early_memremap of heap for heap walk\n",
-				SL_ERROR_HEAP_MAP);
+			slaunch_txt_reset(txt, "Error early_memremap of heap for heap walk\n",
+					  SL_ERROR_HEAP_MAP);
 
 		offset = *((u64 *)heap);
 
@@ -111,9 +125,8 @@ static void __init *txt_early_get_heap_table(void __iomem *txt, u32 type,
 		 * implies the TXT heap is corrupted.
 		 */
 		if (!offset)
-			slaunch_txt_reset(txt,
-				"Error invalid 0 offset in heap walk\n",
-				SL_ERROR_HEAP_ZERO_OFFSET);
+			slaunch_txt_reset(txt, "Error invalid 0 offset in heap walk\n",
+					  SL_ERROR_HEAP_ZERO_OFFSET);
 
 		early_memunmap(heap, sizeof(u64));
 	}
@@ -122,8 +135,7 @@ static void __init *txt_early_get_heap_table(void __iomem *txt, u32 type,
 	base += sizeof(u64);
 	heap = early_memremap(base, bytes);
 	if (!heap)
-		slaunch_txt_reset(txt,
-				  "Error early_memremap of heap section\n",
+		slaunch_txt_reset(txt, "Error early_memremap of heap section\n",
 				  SL_ERROR_HEAP_MAP);
 
 	return heap;
@@ -187,8 +199,7 @@ static void __init slaunch_verify_pmrs(void __iomem *txt)
 	 * by the lo PMR. Note this is the decompressed kernel. The ACM would
 	 * have ensured the compressed kernel (the MLE image) was protected.
 	 */
-	if ((__pa_symbol(_end) < 0x100000000ULL) &&
-	    (__pa_symbol(_end) > os_sinit_data->vtd_pmr_lo_size)) {
+	if (__pa_symbol(_end) < 0x100000000ULL && __pa_symbol(_end) > os_sinit_data->vtd_pmr_lo_size) {
 		err = SL_ERROR_LO_PMR_MLE;
 		errmsg = "Error lo PMR does not cover MLE kernel\n";
 	}
@@ -230,7 +241,7 @@ static void __init slaunch_txt_reserve_range(u64 base, u64 size)
  *  - TPM log external to the TXT heap
  *
  * Also if the low PMR doesn't cover all memory < 4G, any RAM regions above
- * the low PMR must be reservered too.
+ * the low PMR must be reserved too.
  */
 static void __init slaunch_txt_reserve(void __iomem *txt)
 {
@@ -297,10 +308,9 @@ nomdr:
 	for (i = 0; i < e820_table->nr_entries; i++) {
 		base = e820_table->entries[i].addr;
 		size = e820_table->entries[i].size;
-		if ((base >= vtd_pmr_lo_size) && (base < 0x100000000ULL))
+		if (base >= vtd_pmr_lo_size && base < 0x100000000ULL)
 			slaunch_txt_reserve_range(base, size);
-		else if ((base < vtd_pmr_lo_size) &&
-			 (base + size > vtd_pmr_lo_size))
+		else if (base < vtd_pmr_lo_size && base + size > vtd_pmr_lo_size)
 			slaunch_txt_reserve_range(vtd_pmr_lo_size,
 						  base + size - vtd_pmr_lo_size);
 	}
@@ -317,8 +327,6 @@ static void __init slaunch_copy_dmar_table(void __iomem *txt)
 	u32 field_offset, dmar_size, dmar_offset;
 	void *dmar;
 
-	memset(&txt_dmar, 0, PAGE_SIZE);
-
 	field_offset = offsetof(struct txt_sinit_mle_data,
 				processor_scrtm_status);
 	sinit_mle_data = txt_early_get_heap_table(txt, TXT_SINIT_MLE_DATA_TABLE,
@@ -330,24 +338,20 @@ static void __init slaunch_copy_dmar_table(void __iomem *txt)
 	txt_early_put_heap_table(sinit_mle_data, field_offset);
 
 	if (!dmar_size || !dmar_offset)
-		slaunch_txt_reset(txt,
-				  "Error invalid DMAR table values\n",
+		slaunch_txt_reset(txt, "Error invalid DMAR table values\n",
 				  SL_ERROR_HEAP_INVALID_DMAR);
 
 	if (unlikely(dmar_size > PAGE_SIZE))
-		slaunch_txt_reset(txt,
-				  "Error DMAR too big to store\n",
+		slaunch_txt_reset(txt, "Error DMAR too big to store\n",
 				  SL_ERROR_HEAP_DMAR_SIZE);
-
 
 	dmar = txt_early_get_heap_table(txt, TXT_SINIT_MLE_DATA_TABLE,
 					dmar_offset + dmar_size - 8);
 	if (!dmar)
-		slaunch_txt_reset(txt,
-				  "Error early_ioremap of DMAR\n",
+		slaunch_txt_reset(txt, "Error early_ioremap of DMAR\n",
 				  SL_ERROR_HEAP_DMAR_MAP);
 
-	memcpy(&txt_dmar[0], dmar + dmar_offset - 8, dmar_size);
+	memcpy(txt_dmar, dmar + dmar_offset - 8, dmar_size);
 
 	txt_early_put_heap_table(dmar, dmar_offset + dmar_size - 8);
 }
@@ -382,25 +386,21 @@ static void __init slaunch_fetch_values(void __iomem *txt)
 
 	slrt = (struct slr_table *)early_memremap(os_mle_data->slrt, sizeof(*slrt));
 	if (!slrt)
-		slaunch_txt_reset(txt,
-			"Error early_memremap of SLRT failed\n",
-			SL_ERROR_SLRT_MAP);
+		slaunch_txt_reset(txt, "Error early_memremap of SLRT failed\n",
+				  SL_ERROR_SLRT_MAP);
 
 	size = slrt->size;
 	early_memunmap(slrt, sizeof(*slrt));
 
 	slrt = (struct slr_table *)early_memremap(os_mle_data->slrt, size);
 	if (!slrt)
-		slaunch_txt_reset(txt,
-			"Error early_memremap of SLRT failed\n",
-			SL_ERROR_SLRT_MAP);
+		slaunch_txt_reset(txt, "Error early_memremap of SLRT failed\n",
+				  SL_ERROR_SLRT_MAP);
 
-	log_info = (struct slr_entry_log_info *)
-		slr_next_entry_by_tag(slrt, NULL, SLR_ENTRY_LOG_INFO);
+	log_info = (struct slr_entry_log_info *)slr_next_entry_by_tag(slrt, NULL, SLR_ENTRY_LOG_INFO);
 
 	if (!log_info)
-		slaunch_txt_reset(txt,
-				  "SLRT missing logging info entry\n",
+		slaunch_txt_reset(txt, "SLRT missing logging info entry\n",
 				  SL_ERROR_SLRT_MISSING_ENTRY);
 
 	evtlog_addr = log_info->addr;
@@ -435,7 +435,8 @@ void __init slaunch_fixup_jump_vector(void)
 }
 
 /*
- * Intel TXT specific late stub setup and validation.
+ * Intel TXT specific late stub setup and validation called from within
+ * x86 specific setup_arch().
  */
 void __init slaunch_setup_txt(void)
 {
@@ -460,7 +461,7 @@ void __init slaunch_setup_txt(void)
 	txt = early_ioremap(TXT_PUB_CONFIG_REGS_BASE,
 			    TXT_NR_CONFIG_PAGES * PAGE_SIZE);
 	if (!txt)
-		return;
+		panic("Error early_ioremap in TXT setup failed\n");
 
 	memcpy_fromio(&val, txt + TXT_CR_STS, sizeof(val));
 	early_iounmap(txt, TXT_NR_CONFIG_PAGES * PAGE_SIZE);
@@ -497,7 +498,7 @@ void __init slaunch_setup_txt(void)
 	}
 
 	/* Set flags so subsequent code knows the status of the launch */
-	sl_flags |= (SL_FLAG_ACTIVE|SL_FLAG_ARCH_TXT);
+	sl_flags |= (SL_FLAG_ACTIVE | SL_FLAG_ARCH_TXT);
 
 	/*
 	 * Reading the proper DIDVID from the private register space means we
