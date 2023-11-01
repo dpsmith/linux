@@ -21,8 +21,6 @@
 #include <crypto/sha1.h>
 #include <crypto/sha2.h>
 
-#include "early_sha1.h"
-
 #define CAPS_VARIABLE_MTRR_COUNT_MASK	0xff
 
 #define SL_TPM12_LOG		1
@@ -280,16 +278,13 @@ static void sl_tpm12_log_event(u32 pcr, u32 event_type,
 	u8 sha1_hash[SHA1_DIGEST_SIZE] = {0};
 	u8 log_buf[SL_TPM12_LOG_SIZE] = {0};
 	struct tcg_pcr_event *pcr_event;
-	struct sha1_state sctx = {0};
 	u32 total_size;
 
 	pcr_event = (struct tcg_pcr_event *)log_buf;
 	pcr_event->pcr_idx = pcr;
 	pcr_event->event_type = event_type;
 	if (length > 0) {
-		early_sha1_init(&sctx);
-		early_sha1_update(&sctx, data, length);
-		early_sha1_final(&sctx, &sha1_hash[0]);
+		sha1(data, length, &sha1_hash[0]);
 		memcpy(&pcr_event->digest[0], &sha1_hash[0], SHA1_DIGEST_SIZE);
 	}
 	pcr_event->event_size = event_size;
@@ -313,7 +308,6 @@ static void sl_tpm20_log_event(u32 pcr, u32 event_type,
 	struct sha256_state sctx256 = {0};
 	struct tcg_pcr_event2_head *head;
 	struct tcg_event_field *event;
-	struct sha1_state sctx1 = {0};
 	u32 total_size;
 	u16 *alg_ptr;
 	u8 *dgst_ptr;
@@ -338,9 +332,7 @@ static void sl_tpm20_log_event(u32 pcr, u32 event_type,
 			sha256_final(&sctx256, &sha256_hash[0]);
 		} else if (tpm_algs[head->count].alg_id == TPM_ALG_SHA1 &&
 			   length) {
-			early_sha1_init(&sctx1);
-			early_sha1_update(&sctx1, data, length);
-			early_sha1_final(&sctx1, &sha1_hash[0]);
+			sha1(data, length, &sha1_hash[0]);
 		}
 
 		if (tpm_algs[head->count].alg_id == TPM_ALG_SHA256) {
