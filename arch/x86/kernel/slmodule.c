@@ -477,9 +477,27 @@ static void slaunch_pcr_extend(void __iomem *txt)
 
 	tpm = tpm_default_chip();
 	if (!tpm)
-		slaunch_txt_reset(txt,
-				  "Could not get default TPM chip\n",
+		slaunch_txt_reset(txt, "Could not get default TPM chip\n",
 				  SL_ERROR_TPM_INIT);
+
+	if (tpm->locality != 2) {
+		if (tpm->locality >= 0) {
+			int locality = tpm->locality;
+			if (tpm->ops->relinquish_locality &&
+			    tpm->ops->relinquish_locality(tpm, tpm->locality) == 0)
+				pr_info("Relinquished locality %d\n", locality);
+			else
+				slaunch_txt_reset(txt, "Could not relinquish locality\n",
+						  SL_ERROR_TPM_INIT);
+		}
+
+		if (tpm->ops->request_locality && tpm->ops->request_locality(tpm, 2) != 2)
+			slaunch_txt_reset(txt, "Could not request locality 2\n",
+					  SL_ERROR_TPM_INIT);
+
+		tpm->locality = 2;
+	}
+
 	if (evtlog20)
 		slaunch_tpm20_extend(tpm, txt);
 	else
