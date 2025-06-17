@@ -28,7 +28,6 @@
 #include "tpm_common.h"
 #include "tpm1.h"
 #include "tpm2.h"
-#include "tpm_ptp.h"
 
 struct tpm_chip;
 struct trusted_key_payload;
