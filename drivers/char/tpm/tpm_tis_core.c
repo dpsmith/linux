@@ -178,6 +178,12 @@ static int tpm_tis_relinquish_locality(struct tpm_chip *chip, int l)
 {
 	struct tpm_tis_data *priv = dev_get_drvdata(&chip->dev);
 
+	if (l < 0 || l > TPM_MAX_LOCALITY) {
+		dev_warn(&chip->dev, "%s: failed to relinquish unknown locality: %d\n",
+			 __func__, l);
+		return -EINVAL;
+	}
+
 	mutex_lock(&priv->locality_count_mutex);
 	if (priv->locality_count > 0)
 		priv->locality_count--;
@@ -241,11 +247,17 @@ static int tpm_tis_request_locality(struct tpm_chip *chip, int l)
 	}
 
 	mutex_lock(&priv->locality_count_mutex);
-	if (priv->locality_count == 0)
+	if (priv->locality_count == 0) {
 		ret = __tpm_tis_request_locality(chip, l);
-	/* On success ret holds the locality (0-4) */
-	if (ret >= 0)
-		priv->locality_count++;
+		/* On success ret holds the locality (0-4) */
+		if (ret >= 0)
+			priv->locality_count++;
+	} else {
+		if (priv->locality == l)
+			ret = l;
+		else
+			ret = -EBUSY;
+	}
 	mutex_unlock(&priv->locality_count_mutex);
 	return ret;
 }
@@ -826,11 +838,11 @@ static irqreturn_t tpm_tis_revert_interrupts(struct tpm_chip *chip)
 		dev_info(&chip->dev, "\tDMI_PRODUCT_VERSION: %s\n", product);
 	}
 
-	if (tpm_tis_request_locality(chip, 0) != 0)
+	if (tpm_tis_request_locality(chip, priv->locality) != priv->locality)
 		return IRQ_NONE;
 
 	__tpm_tis_disable_interrupts(chip);
-	tpm_tis_relinquish_locality(chip, 0);
+	tpm_tis_relinquish_locality(chip, priv->locality);
 
 	schedule_work(&priv->free_irq_work);
 
@@ -882,9 +894,9 @@ static irqreturn_t tis_int_handler(int dummy, void *dev_id)
 		wake_up_interruptible(&priv->int_queue);
 
 	/* Clear interrupts handled with TPM_EOI */
-	tpm_tis_request_locality(chip, 0);
+	tpm_tis_request_locality(chip, priv->locality);
 	rc = tpm_tis_write32(priv, TPM_INT_STATUS(priv->locality), interrupt);
-	tpm_tis_relinquish_locality(chip, 0);
+	tpm_tis_relinquish_locality(chip, priv->locality);
 	if (rc < 0)
 		goto err;
 
@@ -944,7 +956,7 @@ static int tpm_tis_probe_irq_single(struct tpm_chip *chip, u32 intmask,
 	}
 	priv->irq = irq;
 
-	rc = tpm_tis_request_locality(chip, 0);
+	rc = tpm_tis_request_locality(chip, priv->locality);
 	if (rc < 0)
 		return rc;
 
