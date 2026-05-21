@@ -312,7 +312,7 @@ static ssize_t locality_show(struct device *dev, struct device_attribute *attr, 
 {
 	struct tpm_chip *chip = to_tpm_chip(dev);
 
-	return sprintf(buf, "%u\n", chip->kernel_locality);
+	return sysfs_emit(buf, "%u\n", chip->kernel_locality);
 }
 static DEVICE_ATTR_RO(locality);
 
