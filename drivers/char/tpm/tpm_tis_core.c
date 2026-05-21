@@ -1177,12 +1177,20 @@ int tpm_tis_core_init(struct device *dev, struct tpm_tis_data *priv, int irq,
 	}
 
 	/*
-	 * In order to comply with the TCG DRTM specification, relinquish all
-	 * the localities.
+	 * The TPM state will be in different localities depending on the
+	 * method of launch; SRTM will leave it in Locality 0, while DRTM
+	 * leaves it in Locality 2. Close all localities, then open Locality 0,
+	 * accessible under both SRTM and DRTM, for interrupt support detection
+	 * and setup.
 	 */
 	for (i = 0; i <= TPM_MAX_LOCALITY; i++) {
 		if (check_locality(chip, i))
 			tpm_tis_relinquish_locality(chip, i);
+	}
+	rc = tpm_tis_request_locality(chip, 0);
+	if (rc < 0) {
+		rc = -ENODEV;
+		goto out_err;
 	}
 
 	/* Take control of the TPM's interrupt hardware and shut it off */
@@ -1225,12 +1233,6 @@ int tpm_tis_core_init(struct device *dev, struct tpm_tis_data *priv, int irq,
 	}
 
 	intmask &= ~TPM_GLOBAL_INT_ENABLE;
-
-	rc = tpm_tis_request_locality(chip, 0);
-	if (rc < 0) {
-		rc = -ENODEV;
-		goto out_err;
-	}
 
 	tpm_tis_write32(priv, TPM_INT_ENABLE(priv->locality), intmask);
 	tpm_tis_relinquish_locality(chip, 0);
